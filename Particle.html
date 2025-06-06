@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Particle Form Loop with Stars</title>
+  <style>
+    html, body {
+      margin: 0;
+      overflow: hidden;
+      background: black;
+    }
+    canvas {
+      display: block;
+    }
+  </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+canvas.width = innerWidth;
+canvas.height = innerHeight;
+
+const centerX = canvas.width / 2;
+const centerY = canvas.height / 2;
+
+const particleCount = 1000;
+const particles = [];
+const stars = [];
+
+const starCount = 200;
+for (let i = 0; i < starCount; i++) {
+  stars.push({
+    x: Math.random() * canvas.width,
+    y: Math.random() * canvas.height,
+    baseAlpha: 0.2 + Math.random() * 0.5,
+    offset: Math.random() * 100
+  });
+}
+
+function drawStars(frame) {
+  for (let s of stars) {
+    const alpha = s.baseAlpha + Math.sin(frame / 30 + s.offset) * 0.2;
+    ctx.fillStyle = `rgba(255,255,255,${alpha})`;
+    ctx.fillRect(s.x, s.y, 1, 1);
+  }
+}
+
+// --- Formen ---
+
+function heart(t) {
+  const x = 16 * Math.pow(Math.sin(t), 3);
+  const y = 13 * Math.cos(t) - 5 * Math.cos(2*t) - 2 * Math.cos(3*t) - Math.cos(4*t);
+  return { x: x * 12, y: -y * 12 };
+}
+
+function circle(t) {
+  const r = 160;
+  return { x: r * Math.cos(t), y: r * Math.sin(t) };
+}
+
+function starShape(t) {
+  const spikes = 5;
+  const outer = 160;
+  const inner = 80;
+  const i = Math.floor(t * spikes * 2);
+  const r = i % 2 === 0 ? outer : inner;
+  const angle = t * spikes * 2 * Math.PI;
+  return { x: r * Math.cos(angle), y: r * Math.sin(angle) };
+}
+
+const shapes = [heart, circle, starShape];
+
+let currentShape = shapes[Math.floor(Math.random() * shapes.length)];
+let state = "toForm";
+let frame = 0;
+
+function assignTargets(shapeFunc) {
+  for (let i = 0; i < particles.length; i++) {
+    const t = i / particleCount * Math.PI * 2;
+    const { x, y } = shapeFunc(t);
+    particles[i].tx = centerX + x;
+    particles[i].ty = centerY + y;
+  }
+}
+
+for (let i = 0; i < particleCount; i++) {
+  particles.push({
+    x: centerX,
+    y: centerY,
+    vx: 0,
+    vy: 0,
+    tx: centerX,
+    ty: centerY,
+    color: `hsl(${Math.random() * 360}, 100%, 60%)`
+  });
+}
+
+assignTargets(currentShape);
+
+function allParticlesNear(x, y, threshold = 10) {
+  return particles.every(p =>
+    Math.abs(p.x - x) < threshold && Math.abs(p.y - y) < threshold
+  );
+}
+
+function draw() {
+  frame++;
+  ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  drawStars(frame);
+
+  for (let p of particles) {
+    const dx = p.tx - p.x;
+    const dy = p.ty - p.y;
+    p.vx += dx * 0.01;
+    p.vy += dy * 0.01;
+    p.vx *= 0.9;
+    p.vy *= 0.9;
+    p.x += p.vx;
+    p.y += p.vy;
+
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, 2, 2);
+  }
+
+  if (state === "toForm") {
+    if (particles.every(p => Math.abs(p.tx - p.x) < 10 && Math.abs(p.ty - p.y) < 10)) {
+      // Sobald Form erreicht → zurück zur Mitte
+      for (let p of particles) {
+        p.tx = centerX;
+        p.ty = centerY;
+      }
+      state = "toCenter";
+    }
+  } else if (state === "toCenter") {
+    if (allParticlesNear(centerX, centerY)) {
+      // Sobald Mitte erreicht → neue Form setzen
+      let next;
+      do {
+        next = shapes[Math.floor(Math.random() * shapes.length)];
+      } while (next === currentShape); // nicht dieselbe Form direkt danach
+      currentShape = next;
+      assignTargets(currentShape);
+      state = "toForm";
+    }
+  }
+
+  requestAnimationFrame(draw);
+}
+
+draw();
+</script>
+</body>
+</html>
